@@ -118,6 +118,11 @@ async function main(): Promise<void> {
   const repoFlag = flag(rest, "repo");
 
   try {
+    if (command === "mcp") {
+      // Start the MCP server (stdio); the module runs on import.
+      await import("./mcp.js");
+      return;
+    }
     if (command === "attention") {
       const user = await resolveUser(userFlag);
       const entries = await buildReport(user, repoFlag);

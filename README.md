@@ -109,3 +109,12 @@ Fixtures in `test/fixtures/` are modeled on the real shapes of shadcn-labs/pdfcn
 ## License
 
 MIT. Copyright (c) 2026 Rene Turcios. See LICENSE.
+
+## The toolkit
+
+This tool is one of four in a lifecycle for open-source contribution work, all published under the `@reneturcios` npm scope and each available as a CLI and an MCP server (`<tool> mcp`):
+
+1. **gatefile** (`npx @reneturcios/gatefile`) extracts a repo's contribution gates into a committed `contribution-gates.json`.
+2. **greenlight** (`npx @reneturcios/greenlight`) pre-flights issues (GO / RISKY / TAKEN / GATED / STALE), consumes gatefile's output in `check` and `scan`, then claims, preps, and opens PRs.
+3. **claimcheck** (`npx @reneturcios/claimcheck`) watches for stale claims and fixes parked on forks.
+4. **prwatch** (`npx @reneturcios/prwatch`) triages your open PRs by what needs you right now.
