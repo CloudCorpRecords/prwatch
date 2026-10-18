@@ -18,6 +18,22 @@ npm link   # or run with npx tsx src/cli.ts
 
 Set `GITHUB_TOKEN` (or `GH_TOKEN`) for the 5000 req/hr authenticated rate limit. Without a token it works at the 60 req/hr unauthenticated rate.
 
+## Run it with Docker
+
+prwatch also ships as a container image on GHCR: `ghcr.io/cloudcorprecords/prwatch`.
+
+Use it as a stdio MCP server:
+
+```bash
+docker run -i ghcr.io/cloudcorprecords/prwatch
+```
+
+Any CLI command can be passed after the image name instead of the default `mcp` argument:
+
+```bash
+docker run ghcr.io/cloudcorprecords/prwatch <command> [args]
+```
+
 ## Authentication
 
 A token is optional. `--repo` mode and `prwatch show` work without one, since they never touch the search API. Account-wide reports (`attention` / `list` without `--repo`) use `author:` search, which GitHub restricts for unauthenticated callers on some accounts, so a token is recommended there. A classic token with no scopes is enough for public data; without one you get clear guidance instead of a raw 422.
