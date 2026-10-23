@@ -66,4 +66,10 @@ export interface PRSnapshot {
 export interface ReportEntry {
   pr: { owner: string; repo: string; number: number; title: string; url: string };
   attention: AttentionResult;
+  /**
+   * True when the PR could not be examined (e.g. rate limit hit mid-sweep).
+   * Incomplete entries carry a placeholder score and are segregated after
+   * every scored entry in rankings — never mixed in as a real 0 (PT-6).
+   */
+  incomplete?: boolean;
 }

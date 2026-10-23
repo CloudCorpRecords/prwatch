@@ -15,7 +15,7 @@ import {
 } from "./github.js";
 import { scorePR, rankEntries } from "./attention.js";
 
-const server = new McpServer({ name: "prwatch", version: "0.1.1" });
+const server = new McpServer({ name: "prwatch", version: "0.1.2" });
 
 const text = (obj: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }],
@@ -55,6 +55,7 @@ server.tool(
           entries.push({
             pr: { owner: pr.owner, repo: pr.repo, number: pr.number, title: pr.title, url: pr.url },
             attention: { score: 0, reasons: [err instanceof Error ? err.message : String(err)], category: "WAITING" as const },
+            incomplete: true,
           });
         }
       }

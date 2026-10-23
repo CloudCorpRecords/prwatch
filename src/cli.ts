@@ -57,6 +57,7 @@ async function buildReport(user: string, repo?: string): Promise<ReportEntry[]> 
       entries.push({
         pr: { owner: pr.owner, repo: pr.repo, number: pr.number, title: pr.title, url: pr.url },
         attention: { score: 0, reasons: [err instanceof Error ? err.message : String(err)], category: "WAITING" },
+        incomplete: true,
       });
     }
   }
@@ -72,11 +73,21 @@ function printAttention(entries: ReportEntry[], asJson: boolean): void {
     console.log("No open PRs. Nothing needs your attention.");
     return;
   }
-  for (const e of entries) {
+  const scored = entries.filter((e) => !e.incomplete);
+  const incomplete = entries.filter((e) => e.incomplete);
+  for (const e of scored) {
     console.log(`${SYMBOL[e.attention.category]} ${String(e.attention.score).padStart(3)}  ${e.pr.owner}/${e.pr.repo}#${e.pr.number}`);
     console.log(`         ${e.pr.title}`);
     for (const r of e.attention.reasons.slice(0, 3)) console.log(`         - ${r}`);
     console.log(`         ${e.pr.url}`);
+  }
+  if (incomplete.length > 0) {
+    console.log(`\nIncomplete — not scored (${incomplete.length} PR${incomplete.length === 1 ? "" : "s"} could not be examined):`);
+    for (const e of incomplete) {
+      console.log(`  ${e.pr.owner}/${e.pr.repo}#${e.pr.number}  ${e.pr.title}`);
+      for (const r of e.attention.reasons.slice(0, 1)) console.log(`         - ${r}`);
+      console.log(`         ${e.pr.url}`);
+    }
   }
 }
 

@@ -124,6 +124,22 @@ describe("attention engine categories", () => {
     const ranked = rankEntries([b, a]);
     assert.equal(ranked[0].pr.number, 1);
   });
+
+  it("incomplete entries are segregated after every scored entry (PT-6)", () => {
+    const scored = {
+      attention: { score: 0, reasons: ["No reviews yet. Waiting on reviewers."], category: "WAITING" as const },
+      pr: { owner: "o", repo: "r", number: 1, title: "t", url: "u" },
+    };
+    const incomplete = {
+      attention: { score: 0, reasons: ["GitHub rate limit hit. Set GITHUB_TOKEN for 5000 req/hr."], category: "WAITING" as const },
+      pr: { owner: "o", repo: "r", number: 2, title: "t", url: "u" },
+      incomplete: true,
+    };
+    const ranked = rankEntries([incomplete, scored]);
+    assert.equal(ranked[0].pr.number, 1, "a genuinely scored 0 must outrank an unexamined PR");
+    assert.equal(ranked[1].pr.number, 2);
+    assert.equal(ranked[1].incomplete, true);
+  });
 });
 
 describe("external blocker classification", () => {

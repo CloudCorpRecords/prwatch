@@ -17,7 +17,22 @@ import { join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import type { CombinedStatus, PRSnapshot, ReviewThread, CheckRun, ReviewState } from "./types.js";
 
-const API = "https://api.github.com";
+const DEFAULT_API = "https://api.github.com";
+
+/**
+ * The GitHub API base in use. PRWATCH_GITHUB_BASE_URL wins, then the generic
+ * GITHUB_BASE_URL, then the public API — the same pattern as Greenlight's
+ * GREENLIGHT_GITHUB_BASE_URL, so prwatch can run through a vault-backed
+ * localhost proxy (gh-proxy) at the authenticated rate limit. Trailing
+ * slashes are stripped.
+ */
+export function githubApiBase(): string {
+  for (const raw of [process.env.PRWATCH_GITHUB_BASE_URL, process.env.GITHUB_BASE_URL]) {
+    if (raw && raw.trim().length > 0) return raw.trim().replace(/\/+$/, "");
+  }
+  return DEFAULT_API;
+}
+
 const CACHE_DIR = join(homedir(), ".cache", "prwatch");
 
 function ensureCache(): void {
@@ -103,7 +118,7 @@ export function githubToken(): string | undefined {
 function headers(): Record<string, string> {
   const h: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "prwatch/0.1.0",
+    "User-Agent": "prwatch/0.1.2",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   const token = githubToken();
@@ -112,7 +127,7 @@ function headers(): Record<string, string> {
 }
 
 async function api<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const url = new URL(API + path);
+  const url = new URL(githubApiBase() + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url.toString(), { headers: headers() });
   if (res.status === 403 || res.status === 429) {
@@ -133,12 +148,17 @@ async function fetchAllPages<T>(path: string, params: Record<string, string> = {
   while (first || next) {
     let res: Response;
     if (first) {
-      const url = new URL(API + path);
+      const url = new URL(githubApiBase() + path);
       for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
       res = await fetch(url.toString(), { headers: h });
       first = false;
     } else {
-      res = await fetch(next as string, { headers: h });
+      // Link headers carry absolute api.github.com URLs; retarget them at
+      // the configured base so pagination also goes through a proxy.
+      const target = (next as string).startsWith(DEFAULT_API)
+        ? githubApiBase() + (next as string).slice(DEFAULT_API.length)
+        : (next as string);
+      res = await fetch(target, { headers: h });
     }
     if (res.status === 403 || res.status === 429) {
       throw new RateLimitError("GitHub rate limit hit. Set GITHUB_TOKEN for 5000 req/hr.");
@@ -279,7 +299,13 @@ export function isActionableComment(body: string, diffHunk: string): boolean {
   return /\b(should|consider|recommend|suggest|please|fix|change|update|nit|minor|major)\b/i.test(body);
 }
 
-function deriveReviewState(reviews: RawReview[]): { state: ReviewState; authors: string[] } {
+/**
+ * Derive the effective review state and who is responsible for it.
+ * Attribution (PT-5): `authors` lists only reviewers whose effective state
+ * IS the derived state — a bot's COMMENTED review must not be reported as
+ * "Changes requested by coderabbitai[bot]" when a human requested changes.
+ */
+export function deriveReviewState(reviews: RawReview[]): { state: ReviewState; authors: string[] } {
   const latest = new Map<string, string>();
   for (const r of reviews) {
     if (r.user.login.endsWith("[bot]")) {
@@ -289,11 +315,11 @@ function deriveReviewState(reviews: RawReview[]): { state: ReviewState; authors:
     latest.set(r.user.login, r.state);
   }
   const states = [...latest.values()];
-  const authors = [...latest.keys()];
-  if (states.includes("CHANGES_REQUESTED")) return { state: "CHANGES_REQUESTED", authors };
-  if (states.includes("APPROVED")) return { state: "APPROVED", authors };
-  if (states.includes("COMMENTED")) return { state: "COMMENTED", authors };
-  return { state: "NONE", authors };
+  const withState = (s: string) => [...latest.entries()].filter(([, v]) => v === s).map(([k]) => k);
+  if (states.includes("CHANGES_REQUESTED")) return { state: "CHANGES_REQUESTED", authors: withState("CHANGES_REQUESTED") };
+  if (states.includes("APPROVED")) return { state: "APPROVED", authors: withState("APPROVED") };
+  if (states.includes("COMMENTED")) return { state: "COMMENTED", authors: withState("COMMENTED") };
+  return { state: "NONE", authors: [...latest.keys()] };
 }
 
 export async function buildPRSnapshot(owner: string, repo: string, number: number): Promise<PRSnapshot> {

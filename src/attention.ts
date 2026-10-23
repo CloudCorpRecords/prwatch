@@ -158,8 +158,13 @@ export const CATEGORY_RANK: Record<Category, number> = {
   STALE: 4,
 };
 
-export function rankEntries<T extends { attention: AttentionResult }>(entries: T[]): T[] {
+export function rankEntries<T extends { attention: AttentionResult; incomplete?: boolean }>(entries: T[]): T[] {
   return [...entries].sort((a, b) => {
+    // Incomplete entries (never examined, e.g. rate-limited) are segregated
+    // after all scored entries: their placeholder 0 is not a real score.
+    const ai = a.incomplete ? 1 : 0;
+    const bi = b.incomplete ? 1 : 0;
+    if (ai !== bi) return ai - bi;
     if (b.attention.score !== a.attention.score) return b.attention.score - a.attention.score;
     return CATEGORY_RANK[a.attention.category] - CATEGORY_RANK[b.attention.category];
   });

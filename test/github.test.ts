@@ -10,7 +10,58 @@ import {
   filterOpenPRsByAuthor,
   isAuthorSearchRestricted,
   AuthorSearchRestrictedError,
+  githubApiBase,
+  deriveReviewState,
 } from "../src/github.js";
+
+describe("githubApiBase (PT-1)", () => {
+  it("defaults to https://api.github.com", () => {
+    delete process.env.PRWATCH_GITHUB_BASE_URL;
+    delete process.env.GITHUB_BASE_URL;
+    assert.equal(githubApiBase(), "https://api.github.com");
+  });
+
+  it("honors PRWATCH_GITHUB_BASE_URL, then GITHUB_BASE_URL", () => {
+    process.env.GITHUB_BASE_URL = "http://127.0.0.1:9999";
+    try {
+      assert.equal(githubApiBase(), "http://127.0.0.1:9999");
+      process.env.PRWATCH_GITHUB_BASE_URL = "http://127.0.0.1:8792/";
+      assert.equal(githubApiBase(), "http://127.0.0.1:8792");
+    } finally {
+      delete process.env.PRWATCH_GITHUB_BASE_URL;
+      delete process.env.GITHUB_BASE_URL;
+    }
+  });
+});
+
+describe("deriveReviewState attribution (PT-5)", () => {
+  const review = (login: string, state: string) => ({ id: 1, user: { login }, state, submitted_at: "2026-10-20T00:00:00Z" });
+
+  it("a bot COMMENTED review is not labelled as requesting changes", () => {
+    const { state, authors } = deriveReviewState([
+      review("coderabbitai[bot]", "COMMENTED"),
+      review("coderabbitai[bot]", "COMMENTED"),
+      review("DanRibbens", "CHANGES_REQUESTED"),
+    ]);
+    assert.equal(state, "CHANGES_REQUESTED");
+    assert.deepEqual(authors, ["DanRibbens"]);
+  });
+
+  it("only a bot comment leaves the state COMMENTED, attributed to the bot only as commenter", () => {
+    const { state, authors } = deriveReviewState([review("coderabbitai[bot]", "COMMENTED")]);
+    assert.equal(state, "COMMENTED");
+    assert.deepEqual(authors, ["coderabbitai[bot]"]);
+  });
+
+  it("approval attribution names only the approver", () => {
+    const { state, authors } = deriveReviewState([
+      review("coderabbitai[bot]", "COMMENTED"),
+      review("maintainer-jane", "APPROVED"),
+    ]);
+    assert.equal(state, "APPROVED");
+    assert.deepEqual(authors, ["maintainer-jane"]);
+  });
+});
 
 describe("parsePullUrl", () => {
   it("parses a plain PR URL", () => {
