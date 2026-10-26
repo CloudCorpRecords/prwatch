@@ -15,7 +15,7 @@ import {
 } from "./github.js";
 import { scorePR, rankEntries } from "./attention.js";
 
-const server = new McpServer({ name: "prwatch", version: "0.1.3" });
+const server = new McpServer({ name: "prwatch", version: "0.1.4" });
 
 const text = (obj: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }],

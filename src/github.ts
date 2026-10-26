@@ -118,7 +118,7 @@ export function githubToken(): string | undefined {
 function headers(): Record<string, string> {
   const h: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "prwatch/0.1.2",
+    "User-Agent": "prwatch/0.1.4",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   const token = githubToken();

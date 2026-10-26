@@ -38,8 +38,20 @@ export function isExternalBlocker(run: CheckRun): boolean {
   return EXTERNAL_BLOCKER_PATTERNS.some((p) => p.test(text));
 }
 
+/**
+ * A check run that concluded action_required never ran at all: GitHub is
+ * holding the workflow until a maintainer approves it, which is the normal
+ * state of a first-time fork PR. The author cannot fix it with a code
+ * change, and the run carries no pass or fail evidence about the code, so
+ * it is never a real failure regardless of its name or description.
+ */
+export function isMaintainerGated(run: CheckRun): boolean {
+  return run.conclusion === "action_required";
+}
+
 export function isRealFailure(run: CheckRun): boolean {
-  const failed = ["failure", "error", "timed_out", "action_required"].includes(run.conclusion ?? "");
+  if (isMaintainerGated(run)) return false;
+  const failed = ["failure", "error", "timed_out"].includes(run.conclusion ?? "");
   return failed && !isExternalBlocker(run);
 }
 
@@ -53,7 +65,10 @@ export function scorePR(snapshot: PRSnapshot, now: Date = new Date()): Attention
   }
 
   const realFailures = snapshot.checkRuns.filter(isRealFailure);
-  const externalFailures = snapshot.checkRuns.filter(isExternalBlocker);
+  const gatedRuns = snapshot.checkRuns.filter(isMaintainerGated);
+  const externalFailures = snapshot.checkRuns.filter(
+    (r) => !isMaintainerGated(r) && isExternalBlocker(r)
+  );
   const pendingChecks = snapshot.checkRuns.filter(
     (r) => r.status === "in_progress" || r.status === "queued"
   );
@@ -110,16 +125,28 @@ export function scorePR(snapshot: PRSnapshot, now: Date = new Date()): Attention
   }
 
   const actionSignals = changesRequested || conflicted || realFailures.length > 0 || actionableThreads.length > 0;
-  const onlyExternal = !actionSignals && externalFailures.length > 0;
+  const onlyExternal = !actionSignals && (externalFailures.length > 0 || gatedRuns.length > 0);
 
   if (actionSignals) {
     category = "ACTION";
+    if (gatedRuns.length > 0) {
+      reasons.push(
+        `Also waiting on a maintainer to approve the workflow run for: ${gatedRuns.map((r) => r.name).join(", ")}. Those checks have not run yet.`
+      );
+    }
   } else if (onlyExternal) {
     category = "BLOCKED_EXTERNAL";
     score = Math.min(score, 25);
-    reasons.push(
-      `External blocker, not your code: ${externalFailures.map((r) => r.name).join(", ")}.`
-    );
+    if (gatedRuns.length > 0) {
+      reasons.push(
+        `Waiting on a maintainer to approve the workflow run for: ${gatedRuns.map((r) => r.name).join(", ")}. The checks have not run, so this is not a failure of your code.`
+      );
+    }
+    if (externalFailures.length > 0) {
+      reasons.push(
+        `External blocker, not your code: ${externalFailures.map((r) => r.name).join(", ")}.`
+      );
+    }
   } else if (hasApproval && mergeable && snapshot.checkRuns.length > 0) {
     category = "READY";
     score = Math.min(score, 40);

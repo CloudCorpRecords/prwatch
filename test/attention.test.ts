@@ -12,6 +12,7 @@ import {
   scorePR,
   rankEntries,
   isExternalBlocker,
+  isMaintainerGated,
   isRealFailure,
 } from "../src/attention.js";
 import type { PRSnapshot } from "../src/types.js";
@@ -139,6 +140,56 @@ describe("attention engine categories", () => {
     assert.equal(ranked[0].pr.number, 1, "a genuinely scored 0 must outrank an unexamined PR");
     assert.equal(ranked[1].pr.number, 2);
     assert.equal(ranked[1].incomplete, true);
+  });
+});
+
+describe("fork PRs with action_required suites", () => {
+  it("fixture f: every suite gated is BLOCKED_EXTERNAL, never ACTION", () => {
+    const r = scorePR(fixture("f-fork-action-required.json"), NOW);
+    assert.equal(r.category, "BLOCKED_EXTERNAL");
+    assert.ok(r.score <= 25, `expected <= 25, got ${r.score}`);
+    assert.ok(r.reasons.some((x) => x.includes("approve the workflow run")));
+    assert.ok(!r.reasons.some((x) => x.includes("Failing check")), "a gated run must not be reported as a failing check");
+  });
+
+  it("an action_required run is maintainer gated and never a real failure, whatever its name or description", () => {
+    const run = { name: "build", status: "completed", conclusion: "action_required", description: null };
+    assert.ok(isMaintainerGated(run));
+    assert.ok(!isRealFailure(run));
+    const scary = { name: "tests", status: "completed", conclusion: "action_required", description: "TypeScript errors everywhere" };
+    assert.ok(!isRealFailure(scary), "a run that never ran carries no failure evidence");
+  });
+
+  it("a gated suite next to a real failure stays ACTION, and the gated suite adds no failure score", () => {
+    const s = fixture("f-fork-action-required.json");
+    const mixed = {
+      ...s,
+      checkRuns: [
+        ...s.checkRuns,
+        { name: "lint", status: "completed", conclusion: "failure", description: null },
+      ],
+    };
+    const r = scorePR(mixed, NOW);
+    assert.equal(r.category, "ACTION");
+    // Base 50 plus exactly one real failure at +12; the two gated runs add nothing.
+    assert.equal(r.score, 62, `expected 62, got ${r.score} (${r.reasons.join(" | ")})`);
+    assert.ok(r.reasons.some((x) => x.includes("Failing check: lint")));
+    assert.ok(!r.reasons.some((x) => x.includes("Failing check: build")));
+    assert.ok(r.reasons.some((x) => x.includes("approve the workflow run")));
+  });
+
+  it("an approved, mergeable PR whose suites are gated is not READY", () => {
+    const s = fixture("f-fork-action-required.json");
+    const r = scorePR({ ...s, reviewState: "APPROVED" as const, reviewAuthors: ["maintainer-jane"] }, NOW);
+    assert.equal(r.category, "BLOCKED_EXTERNAL");
+  });
+
+  it("ranking: a gated fork PR ranks below a PR that needs the author", () => {
+    const gated = { attention: scorePR(fixture("f-fork-action-required.json"), NOW), pr: { owner: "o", repo: "r", number: 1, title: "t", url: "u" } };
+    const action = { attention: scorePR(fixture("c-changes-requested.json"), NOW), pr: { owner: "o", repo: "r", number: 2, title: "t", url: "u" } };
+    const ranked = rankEntries([gated, action]);
+    assert.equal(ranked[0].pr.number, 2);
+    assert.equal(ranked[1].pr.number, 1);
   });
 });
 

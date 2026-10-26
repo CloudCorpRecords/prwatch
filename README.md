@@ -101,6 +101,7 @@ Every open PR starts at 50 points and gains or loses urgency from signals:
 | Unresolved review thread that asks for a change | +8 each, category ACTION |
 | Approved, checks green, mergeable | READY, score capped at 45 |
 | Failing check that is not your fault (for example Vercel "Authorization required to deploy") | classified BLOCKED_EXTERNAL, low urgency |
+| Check suite waiting for a maintainer to approve the workflow run (`action_required`, the usual fork PR state) | classified BLOCKED_EXTERNAL, low urgency; the check never ran, so it is never counted as a failing check |
 | Checks still running | WAITING |
 | 7+ days of silence with no approval | STALE |
 
@@ -108,7 +109,7 @@ Score is clamped to 0-100. Categories rank in this order: ACTION, BLOCKED_EXTERN
 
 Two judgment calls worth knowing:
 
-1. **External blockers are not failures.** A preview deploy that fails because a maintainer has to authorize it is GitHub-marked "failure", but no code change fixes it. prwatch detects known patterns (authorization required, sign in to deploy, waiting on team approval) and files them as external, so they never inflate your urgency.
+1. **External blockers are not failures.** A preview deploy that fails because a maintainer has to authorize it is GitHub-marked "failure", but no code change fixes it. prwatch detects known patterns (authorization required, sign in to deploy, waiting on team approval) and files them as external, so they never inflate your urgency. The same applies to a check run that concluded `action_required`: GitHub held the workflow for maintainer approval (the normal state of a fork PR), so the check never ran and carries no failure evidence at all, whatever its name or description says.
 2. **Thread resolution is approximated.** The GitHub REST API cannot say whether a review thread is resolved, so top level review comments from non authors count as open threads. Comments that suggest a change (code suggestions, "please", "consider", "fix") count as actionable.
 
 ## Development
