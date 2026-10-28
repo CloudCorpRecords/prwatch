@@ -1,19 +1,29 @@
 # prwatch
 
+[![npm version](https://img.shields.io/npm/v/@reneturcios/prwatch.svg)](https://www.npmjs.com/package/@reneturcios/prwatch) [![npm downloads](https://img.shields.io/npm/dm/@reneturcios/prwatch.svg)](https://www.npmjs.com/package/@reneturcios/prwatch) [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.CloudCorpRecords%2Fprwatch-blue)](https://registry.modelcontextprotocol.io/)
+
 **What needs your attention right now?** prwatch answers that question for contributors with open PRs.
 
 It was born from a real day: three PRs open in one repo, CodeRabbit reviews on all three, a Vercel deploy failure that was not the author's fault, and no way to see at a glance which PR actually needed work. Manually reading every review thread on every PR is the old way. prwatch ranks your open PRs by urgency with human readable reasons, so you open the right one first.
+
+## Quickstart
+
+```bash
+npx @reneturcios/prwatch attention
+```
 
 ## Install
 
 Requirements: Node 20+.
 
 ```bash
-git clone https://github.com/CloudCorpRecords/prwatch
-cd prwatch
-npm install
-npm run build
-npm link   # or run with npx tsx src/cli.ts
+npx @reneturcios/prwatch attention
+```
+
+Or install it globally:
+
+```bash
+npm install -g @reneturcios/prwatch
 ```
 
 Set `GITHUB_TOKEN` (or `GH_TOKEN`) for the 5000 req/hr authenticated rate limit. Without a token it works at the 60 req/hr unauthenticated rate.
@@ -135,3 +145,5 @@ This tool is one of four in a lifecycle for open-source contribution work, all p
 2. **greenlight** (`npx @reneturcios/greenlight`) pre-flights issues (GO / RISKY / TAKEN / GATED / STALE), consumes gatefile's output in `check` and `scan`, then claims, preps, and opens PRs.
 3. **claimcheck** (`npx @reneturcios/claimcheck`) watches for stale claims and fixes parked on forks.
 4. **prwatch** (`npx @reneturcios/prwatch`) triages your open PRs by what needs you right now.
+
+If prwatch saved you time, star this repo: it helps other developers find it.
